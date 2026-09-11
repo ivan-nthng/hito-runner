@@ -19,6 +19,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
 import { hitoToast } from "@/components/ui/hito-toast";
+import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
 import {
   confirmWorkoutCommandAction,
   reviewWorkoutCommandAction,
@@ -58,6 +59,7 @@ export type ManualWorkoutSourceActionMenuProps = {
   canAddActivity?: boolean;
   canCopy?: boolean;
   canClear?: boolean;
+  canEdit?: boolean;
   canMove?: boolean;
   children: ReactNode;
   disabled?: boolean;
@@ -76,6 +78,7 @@ export function ManualWorkoutSourceActionMenu({
   canAddActivity = false,
   canCopy = true,
   canClear = false,
+  canEdit = false,
   canMove = false,
   children,
   disabled = false,
@@ -97,6 +100,7 @@ export function ManualWorkoutSourceActionMenu({
   const [status, setStatus] = useState<ManualSourceActionStatus>("idle");
   const [deleteReviewResult, setDeleteReviewResult] =
     useState<ManualWorkoutDeleteClearReady | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const isBusy = status !== "idle";
 
@@ -129,6 +133,15 @@ export function ManualWorkoutSourceActionMenu({
     });
   };
 
+  const openEdit = () => {
+    if (typeof window === "undefined") {
+      setEditOpen(true);
+      return;
+    }
+
+    window.requestAnimationFrame(() => setEditOpen(true));
+  };
+
   const submitDeleteReview = async () => {
     if (disabled || !canClear || status !== "idle") return;
 
@@ -137,8 +150,8 @@ export function ManualWorkoutSourceActionMenu({
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_DELETE_CLEAR_TOAST_ID,
-      title: t("Reviewing clear"),
-      description: t("Hito is checking whether this manual workout can be cleared."),
+      title: t("Reviewing delete"),
+      description: t("Hito is checking whether this workout can be deleted from Calendar."),
     });
 
     try {
@@ -154,9 +167,9 @@ export function ManualWorkoutSourceActionMenu({
         setDeleteReviewResult(null);
         hitoToast.error({
           id: MANUAL_DELETE_CLEAR_TOAST_ID,
-          title: t("Clear blocked"),
+          title: t("Delete blocked"),
           description:
-            result.issues[0]?.message ?? t("Could not review this workout for clearing."),
+            result.issues[0]?.message ?? t("Could not review this workout for deletion."),
         });
         return;
       }
@@ -165,8 +178,8 @@ export function ManualWorkoutSourceActionMenu({
         setDeleteReviewResult(null);
         hitoToast.error({
           id: MANUAL_DELETE_CLEAR_TOAST_ID,
-          title: t("Clear blocked"),
-          description: t("Could not review this workout for clearing."),
+          title: t("Delete blocked"),
+          description: t("Could not review this workout for deletion."),
         });
         return;
       }
@@ -174,17 +187,17 @@ export function ManualWorkoutSourceActionMenu({
       setDeleteReviewResult(result.candidate);
       hitoToast.success({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: t("Clear reviewed"),
-        description: t("Confirm before Hito removes this Calendar workout."),
+        title: t("Delete reviewed"),
+        description: t("Confirm before Hito removes this workout from Calendar."),
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : t("Could not review this workout for clearing.");
+        error instanceof Error ? error.message : t("Could not review this workout for deletion.");
       setStatus("idle");
       setDeleteReviewResult(null);
       hitoToast.error({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: t("Clear review failed"),
+        title: t("Delete review failed"),
         description: message,
       });
     }
@@ -198,8 +211,8 @@ export function ManualWorkoutSourceActionMenu({
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_DELETE_CLEAR_TOAST_ID,
-      title: t("Clearing workout"),
-      description: t("Hito is confirming this Calendar change before removing the workout row."),
+      title: t("Deleting workout"),
+      description: t("Hito is confirming this Calendar change before deleting the workout."),
     });
 
     try {
@@ -220,15 +233,15 @@ export function ManualWorkoutSourceActionMenu({
         setDeleteReviewResult(null);
         hitoToast.error({
           id: MANUAL_DELETE_CLEAR_TOAST_ID,
-          title: t("Workout not cleared"),
-          description: result.ok ? t("The Calendar workout could not be cleared.") : result.message,
+          title: t("Workout not deleted"),
+          description: result.ok ? t("The Calendar workout could not be deleted.") : result.message,
         });
         return;
       }
 
       hitoToast.success({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: t("Workout cleared"),
+        title: t("Workout deleted"),
         description: t("Refreshing from saved Calendar truth."),
       });
       confirmInFlightRef.current = false;
@@ -238,14 +251,14 @@ export function ManualWorkoutSourceActionMenu({
       await onCleared?.();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : t("The Calendar workout could not be cleared.");
+        error instanceof Error ? error.message : t("The Calendar workout could not be deleted.");
       confirmInFlightRef.current = false;
       setStatus("idle");
       setConfirmMessage(null);
       setDeleteReviewResult(null);
       hitoToast.error({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: t("Workout not cleared"),
+        title: t("Workout not deleted"),
         description: message,
       });
     }
@@ -271,8 +284,14 @@ export function ManualWorkoutSourceActionMenu({
                 <Icon name="activity" size="xs" />
                 {t("Add activity")}
               </DropdownMenuItem>
-              {canCopy || canMove || canClear ? <DropdownMenuSeparator /> : null}
+              {canEdit || canCopy || canMove || canClear ? <DropdownMenuSeparator /> : null}
             </>
+          ) : null}
+          {canEdit ? (
+            <DropdownMenuItem disabled={disabled || isBusy} onSelect={openEdit}>
+              <Icon name="edit" size="xs" />
+              {t("Edit workout")}
+            </DropdownMenuItem>
           ) : null}
           {canCopy ? (
             <DropdownMenuItem disabled={disabled || isBusy} onSelect={copySource}>
@@ -288,14 +307,14 @@ export function ManualWorkoutSourceActionMenu({
           ) : null}
           {canClear ? (
             <>
-              {canCopy || canMove ? <DropdownMenuSeparator /> : null}
+              {canEdit || canCopy || canMove ? <DropdownMenuSeparator /> : null}
               <DropdownMenuItem
                 className="text-destructive"
                 disabled={disabled || isBusy}
                 onSelect={() => void submitDeleteReview()}
               >
                 <Icon name="trash" size="xs" />
-                {t("Clear workout")}
+                {t("Delete workout")}
               </DropdownMenuItem>
             </>
           ) : null}
@@ -320,6 +339,16 @@ export function ManualWorkoutSourceActionMenu({
           workout={workout}
         />
       ) : null}
+
+      <ManualWorkoutPersistedEditDialog
+        provenancePlanId={provenancePlanId}
+        onEdited={() => onCleared?.()}
+        onOpenChange={setEditOpen}
+        open={editOpen}
+        plannedWorkoutId={sourceWorkoutId}
+        title={title}
+        workoutDate={sourceWorkoutDate}
+      />
     </>
   );
 }
@@ -400,7 +429,7 @@ function ManualDeleteClearReadyDialog({
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-ui-title-md text-foreground">
-            {t("Review clear workout")}
+            {t("Review delete workout")}
           </DialogTitle>
           <DialogDescription className="hito-body-md text-secondary">
             {t("Confirm before Hito removes this workout from your Calendar.")}
@@ -412,7 +441,7 @@ function ManualDeleteClearReadyDialog({
               <div className="min-w-0">
                 <p className="hito-body-md text-foreground">{dateLabel}</p>
                 <p className="hito-body-sm mt-1 text-secondary">
-                  {t("Selected Calendar day for the workout being cleared.")}
+                  {t("Selected Calendar day for the workout being deleted.")}
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
@@ -440,7 +469,7 @@ function ManualDeleteClearReadyDialog({
                 <p className="hito-body-md text-foreground">{t("What changes")}</p>
                 <p className="hito-body-sm mt-1 text-secondary">
                   {t(
-                    "Hito deletes exactly this workout row and refreshes the Calendar from saved truth.",
+                    "Hito deletes this workout and its result from Calendar. Any saved Activity remains in Activity History.",
                   )}
                 </p>
               </div>
@@ -492,12 +521,12 @@ function ManualDeleteClearReadyDialog({
             {status === "creating" ? (
               <>
                 <Icon name="loader" size="xs" className="animate-spin" />
-                {t("Clearing workout...")}
+                {t("Deleting workout...")}
               </>
             ) : (
               <>
                 <Icon name="trash" size="xs" />
-                {t("Clear workout")}
+                {t("Delete workout")}
               </>
             )}
           </HitoButton>

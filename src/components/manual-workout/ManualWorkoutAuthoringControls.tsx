@@ -641,9 +641,7 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon name="edit" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-body-md text-foreground block">
-                    {t("Start from scratch")}
-                  </span>
+                  <span className="hito-body-md text-foreground block">{t("New Workout")}</span>
                   <span className="hito-body-sm mt-1 text-secondary block">
                     {t("Start with a blank workout.")}
                   </span>
@@ -652,7 +650,7 @@ export function ManualWorkoutAddMenu({
               <DropdownMenuItem disabled={isBusy} onSelect={openTemplatePickerDialog}>
                 <Icon name="workout" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-body-md text-foreground block">{t("Choose template")}</span>
+                  <span className="hito-body-md text-foreground block">{t("From Template")}</span>
                   <span className="hito-body-sm mt-1 text-secondary block">
                     {t("Browse built-in and saved templates.")}
                   </span>

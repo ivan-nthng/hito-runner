@@ -63,6 +63,7 @@ export type CalendarWorkoutActionContext = ManualCopiedWorkoutSource & {
   canDirectCopy: boolean;
   canDirectMove: boolean;
   canDragInitiate: boolean;
+  canEditContent: boolean;
   canRequestClearReview: boolean;
 };
 
@@ -242,7 +243,10 @@ export function resolveCalendarAddActionContext(
     snapshot.mode === "authenticated" &&
     (!workout || workout.type === "rest") &&
     iso <= snapshot.currentDate;
-  const canAddWorkout = addCapability?.allowed === true && !workout && iso >= snapshot.currentDate;
+  const canAddWorkout =
+    addCapability?.allowed === true &&
+    (!workout || workout.type === "rest") &&
+    iso >= snapshot.currentDate;
   const canAcceptMoveTarget =
     moveCapability?.allowed === true && moveTargetHint.canAcceptMoveTarget;
 
@@ -273,6 +277,9 @@ export function resolveCalendarWorkoutActionContext(
   const canDragInitiate = Boolean(
     calendarEditing?.moveWorkout.allowed && sourceEditing?.canDragInitiate,
   );
+  const canEditContent = Boolean(
+    calendarEditing?.editWorkout.allowed && sourceEditing?.canEditContent,
+  );
   const canRequestClearReview = Boolean(
     calendarEditing?.clearWorkout.allowed && sourceEditing?.canClear,
   );
@@ -283,7 +290,8 @@ export function resolveCalendarWorkoutActionContext(
     !canDirectCopy &&
     !canRequestClearReview &&
     !canDirectMove &&
-    !canDragInitiate
+    !canDragInitiate &&
+    !canEditContent
   )
     return null;
 
@@ -293,6 +301,7 @@ export function resolveCalendarWorkoutActionContext(
     canDirectCopy,
     canDirectMove,
     canDragInitiate,
+    canEditContent,
     canRequestClearReview,
     sourceWorkoutDate: iso,
     sourceWorkoutId: workout.id,

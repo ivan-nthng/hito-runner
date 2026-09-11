@@ -11,7 +11,7 @@ import { normalizePersistedWorkoutDocument } from "@/lib/workout-document";
 type CalendarWorkoutMutationEventRow =
   Database["public"]["Tables"]["calendar_workout_mutation_events"]["Row"];
 type RpcPayload = { [key: string]: Json | undefined };
-type AtomicCalendarWorkoutMutationKind = "add" | "clear" | "move" | "confirm_activity";
+type AtomicCalendarWorkoutMutationKind = "add" | "clear" | "delete" | "move" | "confirm_activity";
 
 export class CalendarPersistenceRejection extends Error {
   constructor(
@@ -608,14 +608,20 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
   if (log) {
     return blockedSourceEditing(
       log.outcome === "skipped" ? "skipped_logged_workout" : "logged_workout",
-      "Logged workouts cannot be copied, moved, cleared, edited, or dragged.",
+      "Logged workouts can be copied or deleted, but cannot be moved, edited, or dragged.",
+      true,
+      false,
+      true,
     );
   }
 
   if (evidenceWorkoutIds.has(workout.id)) {
     return blockedSourceEditing(
       "evidence_backed_workout",
-      "Evidence-backed workouts cannot be copied, moved, cleared, edited, or dragged.",
+      "Evidence-backed workouts can be copied or deleted, but cannot be moved, edited, or dragged.",
+      true,
+      false,
+      true,
     );
   }
 
@@ -633,7 +639,10 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
 
   return blockedSourceEditing(
     "protected_history",
-    "Past workouts cannot be copied, moved, cleared, edited, or dragged.",
+    "Past workouts can be copied or deleted, but cannot be moved, edited, or dragged.",
+    true,
+    false,
+    true,
   );
 }
 
@@ -671,10 +680,11 @@ function blockedSourceEditing(
   message: string,
   canCopy = false,
   canEditContent = false,
+  canClear = false,
 ): CalendarWorkoutSourceEditingCapabilities {
   return {
     canMove: false,
-    canClear: false,
+    canClear,
     canCopy,
     canEditContent,
     canDirectCopy: canCopy,

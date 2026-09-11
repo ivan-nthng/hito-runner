@@ -8,11 +8,7 @@ import {
   applyAtomicCalendarWorkoutMutation,
   buildCalendarWorkoutMutationEvent,
 } from "@/lib/runner-calendar-mutations";
-import {
-  fetchManualWorkoutEvidenceWorkoutIds,
-  isProtectedManualWorkoutCopySource,
-  type ManualWorkoutActivePlanAddDependencies,
-} from "@/lib/manual-workout-authoring/active-plan-add";
+import { type ManualWorkoutActivePlanAddDependencies } from "@/lib/manual-workout-authoring/active-plan-add";
 import { MANUAL_WORKOUT_AUTHORING_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 import { workoutDocumentHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import { stableJsonEqual } from "@/lib/review-token-signing";
@@ -177,29 +173,10 @@ async function resolveCalendarWorkoutCopyCommandTarget(
     );
   }
 
-  let evidenceIds: Set<string>;
-  try {
-    evidenceIds = await (
-      dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds
-    )(userId, [sourceWorkout.id]);
-  } catch {
-    return rejectCopyCommand(
-      "persistence_failed",
-      "The Calendar could not verify workout evidence before copying.",
-    );
-  }
-  if (
-    isProtectedManualWorkoutCopySource(
-      sourceWorkout,
-      currentDate,
-      context.existingWorkouts.logsByWorkoutId,
-      evidenceIds,
-    ) ||
-    command.targetDate < currentDate
-  ) {
+  if (command.targetDate < currentDate) {
     return rejectCopyCommand(
       "protected_operation",
-      "Past, logged, or evidence-backed workouts cannot be copied to this date.",
+      "A copied workout can only be placed on today or a future date.",
     );
   }
   if (

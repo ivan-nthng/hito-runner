@@ -9,13 +9,8 @@ import {
   getCalendarWorkoutMutationContext,
   type CalendarWorkoutContext,
   type PersistedPlannedWorkoutRow,
-  type PersistedWorkoutLogRow,
 } from "@/lib/runner-calendar-persistence";
-import {
-  fetchManualWorkoutEvidenceWorkoutIds,
-  type ManualWorkoutActivePlanAddDependencies,
-  type ManualWorkoutEvidenceFetcher,
-} from "@/lib/manual-workout-authoring/active-plan-add";
+import { type ManualWorkoutActivePlanAddDependencies } from "@/lib/manual-workout-authoring/active-plan-add";
 import { MANUAL_WORKOUT_AUTHORING_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 import { workoutDocumentHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import { stableJsonEqual } from "@/lib/review-token-signing";
@@ -50,7 +45,6 @@ export type ManualWorkoutDeleteClearCommandDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
   "getCalendarWorkoutContextForUser" | "currentDate"
 > & {
-  fetchEvidenceWorkoutIds?: ManualWorkoutEvidenceFetcher;
   persistWorkoutDelete?: typeof persistManualWorkoutDeleteClear;
 };
 
@@ -85,6 +79,7 @@ type ManualWorkoutDeleteClearTarget =
 type PersistManualWorkoutDeleteClearInput = {
   userId: string;
   currentDate: string;
+  operation: "delete" | "clear";
   targetWorkout: PersistedPlannedWorkoutRow;
   remainingWorkouts: readonly PersistedPlannedWorkoutRow[];
   review: ManualWorkoutDeleteClearReview;
@@ -177,6 +172,7 @@ export async function executeCalendarWorkoutDeleteClearCommandForUser(
     const persisted = await persistDelete({
       userId,
       currentDate: target.currentDate,
+      operation: command.operation,
       targetWorkout: target.targetWorkout,
       remainingWorkouts: target.remainingWorkouts,
       review: { ...target.review, reviewChecksum: candidate.reviewChecksum },
@@ -221,6 +217,7 @@ function rejectDeleteClearCommand(
 export async function persistManualWorkoutDeleteClear({
   userId,
   currentDate,
+  operation,
   targetWorkout,
   review,
 }: PersistManualWorkoutDeleteClearInput) {
@@ -247,7 +244,7 @@ export async function persistManualWorkoutDeleteClear({
   const persisted = await applyAtomicCalendarWorkoutMutation({
     userId,
     currentDate,
-    mutationKind: "clear",
+    mutationKind: operation,
     expectedSourceWorkout: buildFullCalendarWorkoutFingerprint(targetWorkout) as unknown as Json,
     expectedTargetWorkout: null,
     workoutInsert: null,
@@ -272,8 +269,6 @@ async function resolveManualWorkoutDeleteClearTarget(
 ): Promise<ManualWorkoutDeleteClearTarget> {
   const getContext =
     dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
-  const fetchEvidence =
-    dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
   const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
 
   let planContext: CalendarWorkoutContext;
@@ -306,14 +301,6 @@ async function resolveManualWorkoutDeleteClearTarget(
     };
   }
 
-  if (target.workout.workout_date < currentDate) {
-    return {
-      ok: false,
-      reason: "protected_day",
-      message: "Past workouts cannot be cleared.",
-    };
-  }
-
   const sourceDocument = normalizePersistedWorkoutDocument(target.workout);
   if (!sourceDocument.ok || workoutDocumentHasUnsafeMetricTruth(sourceDocument.value)) {
     return {
@@ -322,21 +309,6 @@ async function resolveManualWorkoutDeleteClearTarget(
       message: sourceDocument.ok
         ? "This workout contains target provenance that cannot be cleared safely."
         : sourceDocument.message,
-    };
-  }
-
-  const evidenceIds = await fetchEvidence(userId, [target.workout.id]);
-  if (
-    isProtectedWorkoutRowForClear(
-      target.workout,
-      planContext.existingWorkouts.logsByWorkoutId,
-      evidenceIds,
-    )
-  ) {
-    return {
-      ok: false,
-      reason: "protected_day",
-      message: "This workout has protected history or evidence and cannot be deleted here.",
     };
   }
 
@@ -394,14 +366,6 @@ function resolveDeleteTargetWorkout(input: {
   }
 
   return { ok: true, workout };
-}
-
-function isProtectedWorkoutRowForClear(
-  workout: PersistedPlannedWorkoutRow,
-  logsByWorkoutId: Map<string, PersistedWorkoutLogRow>,
-  evidenceWorkoutIds: Set<string>,
-) {
-  return logsByWorkoutId.has(workout.id) || evidenceWorkoutIds.has(workout.id);
 }
 
 function buildDeleteClearReview(input: {

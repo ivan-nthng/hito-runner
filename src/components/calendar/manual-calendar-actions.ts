@@ -1,4 +1,5 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 import type {
   ManualWorkoutMoveRequest,
@@ -474,7 +475,7 @@ export function manualMoveSourceDragProps(
     onDragStart: (event: DragEvent<HTMLElement>) => {
       if (!context?.canDragInitiate) return;
       event.stopPropagation();
-      manualCalendarActionState.onMoveWorkout(context);
+      flushSync(() => manualCalendarActionState.onMoveWorkout(context));
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("application/x-hito-manual-workout-move", context.sourceWorkoutId);
       event.dataTransfer.setData("text/plain", context.sourceWorkoutId);

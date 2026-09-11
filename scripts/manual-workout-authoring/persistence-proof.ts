@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import {
   confirmWorkoutCommandForUser,
@@ -8,12 +9,26 @@ import {
   listManualWorkoutSavedTemplatesForUser,
   reviewWorkoutCommandForUser,
 } from "../../src/lib/manual-workout-authoring";
-import type { PersistedPlannedWorkoutRow } from "../../src/lib/runner-calendar-persistence";
+import {
+  executeCalendarWorkoutCopyCommandForUser,
+  reviewCalendarWorkoutCopyCommandForUser,
+} from "../../src/lib/manual-workout-authoring/copy-paste";
+import {
+  executeCalendarWorkoutDeleteClearCommandForUser,
+  reviewCalendarWorkoutDeleteClearCommandForUser,
+} from "../../src/lib/manual-workout-authoring/delete-clear";
+import { listRunnerActivityHistoryForUser } from "../../src/lib/runner-activity/history-read-model";
+import {
+  getCalendarWorkoutMutationContext,
+  type PersistedPlannedWorkoutRow,
+} from "../../src/lib/runner-calendar-persistence";
+import { resolveCalendarWorkoutSourceEditingCapabilities } from "../../src/lib/runner-calendar-mutations";
 import type { Json } from "../../src/lib/supabase/database";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import { addDaysIso, todayIso } from "../../src/lib/training";
 import { updateRunnerCalendarTimezoneForUserId } from "../../src/lib/user-settings-actions";
 import { normalizePersistedWorkoutDocument } from "../../src/lib/workout-document";
+import { ingestGarminWorkoutResult } from "../../src/lib/workout-result-import/ingest-garmin-result";
 import {
   acquireQaPoolSupabaseUser,
   DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
@@ -532,26 +547,248 @@ export async function validateManualWorkoutDisposablePersistenceProof({
     assert.equal(malformed.ok, false);
     if (!malformed.ok) assert.equal(malformed.reason, "unsupported_payload");
 
-    const evidence = await insertProtectedWorkoutEvidence(supabase, owner.userId, replacedRow);
-    const protectedDelete = await reviewWorkoutCommandForUser(owner.userId, {
-      operation: "delete",
-      workoutId: plannedWorkoutId,
+    const fitFixture = await readFile(new URL("../../sample-fit-from-zip.fit", import.meta.url));
+    const evidence = await ingestGarminWorkoutResult({
+      userId: owner.userId,
+      plannedWorkoutId,
+      file: new File([fitFixture], "hito-311-result.fit", {
+        type: "application/octet-stream",
+      }),
     });
-    assert.equal(protectedDelete.ok, false);
-    if (!protectedDelete.ok) assert.equal(protectedDelete.issues[0]?.code, "protected_operation");
+    assert.ok(evidence.latestAsset?.id, "FIT ingestion must retain a result asset.");
+    assert.ok(
+      evidence.latestActualMetrics?.id,
+      "FIT ingestion must create the Calendar projection.",
+    );
+    const exactDuplicate = await ingestGarminWorkoutResult({
+      userId: owner.userId,
+      plannedWorkoutId,
+      file: new File([fitFixture], "hito-311-result-duplicate.fit", {
+        type: "application/octet-stream",
+      }),
+    });
+    assert.equal(exactDuplicate.runnerActivity.id, evidence.runnerActivity.id);
+    assert.equal(
+      exactDuplicate.runnerActivity.sourceRevisionId,
+      evidence.runnerActivity.sourceRevisionId,
+    );
+
+    const sourceDateAsPast = addDaysIso(workoutDate, 1);
+    const resultCopyDate = addDaysIso(workoutDate, 9);
+    const evidenceContext = await getCalendarWorkoutMutationContext(owner.userId);
+    const evidenceWorkout = evidenceContext.existingWorkouts.workouts.find(
+      (workout) => workout.id === plannedWorkoutId,
+    );
+    assert.ok(evidenceWorkout, "The result-backed Calendar workout must remain owner-visible.");
+    const evidencePlan = evidenceWorkout.plan_cycle_id
+      ? evidenceContext.sourcePlansById.get(evidenceWorkout.plan_cycle_id)
+      : null;
+    assert.deepEqual(
+      {
+        planCycleId: evidenceWorkout.plan_cycle_id,
+        originKind: evidenceWorkout.origin_kind,
+        sourceWorkoutId: evidenceWorkout.source_workout_id,
+        sourceWorkoutType: evidenceWorkout.source_workout_type,
+        workoutFamily: evidenceWorkout.workout_family,
+        workoutIdentity: evidenceWorkout.workout_identity,
+      },
+      {
+        planCycleId: null,
+        originKind: "manual",
+        sourceWorkoutId: initializer.document.sourceWorkoutId,
+        sourceWorkoutType: initializer.document.sourceWorkoutType,
+        workoutFamily: initializer.document.workoutFamily,
+        workoutIdentity: initializer.document.workoutIdentity,
+      },
+      "The result-backed Calendar workout must retain source provenance without fabricating a plan container.",
+    );
+    for (const capabilityDate of [workoutDate, sourceDateAsPast]) {
+      const evidenceCapabilities = resolveCalendarWorkoutSourceEditingCapabilities({
+        provenancePlan: evidencePlan,
+        workout: evidenceWorkout,
+        log: evidenceContext.existingWorkouts.logsByWorkoutId.get(plannedWorkoutId) ?? null,
+        evidenceWorkoutIds: new Set([plannedWorkoutId]),
+        currentDate: capabilityDate,
+      });
+      assert.deepEqual(
+        {
+          canClear: evidenceCapabilities.canClear,
+          canCopy: evidenceCapabilities.canCopy,
+          canDirectCopy: evidenceCapabilities.canDirectCopy,
+          canMove: evidenceCapabilities.canMove,
+          canDirectMove: evidenceCapabilities.canDirectMove,
+          canDragInitiate: evidenceCapabilities.canDragInitiate,
+          canEditContent: evidenceCapabilities.canEditContent,
+        },
+        {
+          canClear: true,
+          canCopy: true,
+          canDirectCopy: true,
+          canMove: false,
+          canDirectMove: false,
+          canDragInitiate: false,
+          canEditContent: false,
+        },
+        "Today/past result-backed workouts allow Copy/Delete while Move/Edit/drag stay closed.",
+      );
+    }
+    const resultCopyReview = await reviewCalendarWorkoutCopyCommandForUser(
+      owner.userId,
+      { operation: "copy", workoutId: plannedWorkoutId, targetDate: resultCopyDate },
+      { currentDate: sourceDateAsPast },
+    );
+    assert.equal(resultCopyReview.ok, true, JSON.stringify(resultCopyReview));
+    if (!resultCopyReview.ok) throw new Error(resultCopyReview.issues[0]?.message);
+    const resultCopy = await executeCalendarWorkoutCopyCommandForUser(
+      owner.userId,
+      resultCopyReview.candidate,
+      { currentDate: sourceDateAsPast },
+    );
+    assert.equal(resultCopy.ok, true, JSON.stringify(resultCopy));
+    if (!resultCopy.ok) throw new Error(resultCopy.message);
+    const resultCopyWorkoutId = readJsonString(resultCopy.result, "targetWorkoutId");
+    assert.equal(
+      (
+        await supabase
+          .from("workout_result_assets")
+          .select("id")
+          .eq("user_id", owner.userId)
+          .eq("planned_workout_id", resultCopyWorkoutId)
+      ).data?.length,
+      0,
+      "Copy must copy the workout prescription without copying factual result evidence.",
+    );
+
+    const staleResultDelete = await reviewCalendarWorkoutDeleteClearCommandForUser(
+      owner.userId,
+      {
+        operation: "delete",
+        workoutId: plannedWorkoutId,
+        expectedFingerprint: { stale: true },
+      },
+      { currentDate: sourceDateAsPast },
+    );
+    assert.equal(staleResultDelete.ok, false, "stale Delete evidence must fail before mutation");
+    if (!staleResultDelete.ok) {
+      assert.equal(staleResultDelete.issues[0]?.code, "stale_reference");
+    }
+    const foreignResultDelete = await reviewCalendarWorkoutDeleteClearCommandForUser(
+      isolationUser.userId,
+      { operation: "delete", workoutId: plannedWorkoutId },
+      { currentDate: sourceDateAsPast },
+    );
+    assert.equal(foreignResultDelete.ok, false, "Delete must not reveal a foreign workout");
+    if (!foreignResultDelete.ok) assert.equal(foreignResultDelete.issues[0]?.code, "not_found");
+
+    const sourceRevisionBeforeDelete = await supabase
+      .from("runner_activity_source_revisions")
+      .select("id, raw_state, raw_storage_bucket, raw_storage_path")
+      .eq("id", evidence.runnerActivity.sourceRevisionId)
+      .eq("user_id", owner.userId)
+      .single();
+    if (sourceRevisionBeforeDelete.error) throw new Error(sourceRevisionBeforeDelete.error.message);
+    const activityHistoryBeforeDelete = await listRunnerActivityHistoryForUser({
+      userId: owner.userId,
+    });
+    assert.ok(
+      activityHistoryBeforeDelete.items.some((item) => item.id === evidence.runnerActivity.id),
+      "The factual Activity must be visible in Activity History before Calendar Delete.",
+    );
+
+    const resultDeleteReview = await reviewCalendarWorkoutDeleteClearCommandForUser(
+      owner.userId,
+      { operation: "delete", workoutId: plannedWorkoutId },
+      { currentDate: sourceDateAsPast },
+    );
+    assert.equal(resultDeleteReview.ok, true, JSON.stringify(resultDeleteReview));
+    if (!resultDeleteReview.ok) throw new Error(resultDeleteReview.issues[0]?.message);
+    const resultDeleted = await executeCalendarWorkoutDeleteClearCommandForUser(
+      owner.userId,
+      resultDeleteReview.candidate,
+      { currentDate: sourceDateAsPast },
+    );
+    assert.equal(resultDeleted.ok, true, JSON.stringify(resultDeleted));
+    if (!resultDeleted.ok) throw new Error(resultDeleted.message);
+    assert.equal(
+      readJsonString(resultDeleted.result, "operation"),
+      "delete",
+      "Result-backed Calendar deletion must remain bound to the reviewed Delete operation.",
+    );
+
+    const [deletedCalendarWorkout, retainedAsset, retainedSourceRevision, retainedMatch] =
+      await Promise.all([
+        supabase
+          .from("planned_workouts")
+          .select("id")
+          .eq("id", plannedWorkoutId)
+          .eq("user_id", owner.userId)
+          .maybeSingle(),
+        supabase
+          .from("workout_result_assets")
+          .select("id, planned_workout_id, workout_log_id, activity_source_revision_id")
+          .eq("id", evidence.latestAsset.id)
+          .eq("user_id", owner.userId)
+          .single(),
+        supabase
+          .from("runner_activity_source_revisions")
+          .select("id, raw_state, raw_storage_bucket, raw_storage_path")
+          .eq("id", evidence.runnerActivity.sourceRevisionId)
+          .eq("user_id", owner.userId)
+          .single(),
+        supabase
+          .from("runner_activity_planned_workout_matches")
+          .select("activity_id, planned_workout_id")
+          .eq("activity_id", evidence.runnerActivity.id)
+          .eq("user_id", owner.userId)
+          .single(),
+      ]);
+    for (const result of [
+      deletedCalendarWorkout,
+      retainedAsset,
+      retainedSourceRevision,
+      retainedMatch,
+    ]) {
+      if (result.error) throw new Error(result.error.message);
+    }
+    assert.equal(deletedCalendarWorkout.data, null);
+    assert.equal(retainedAsset.data.planned_workout_id, null);
+    assert.equal(retainedAsset.data.workout_log_id, null);
+    assert.equal(
+      retainedAsset.data.activity_source_revision_id,
+      evidence.runnerActivity.sourceRevisionId,
+    );
+    assert.deepEqual(retainedSourceRevision.data, sourceRevisionBeforeDelete.data);
+    assert.deepEqual(retainedMatch.data, {
+      activity_id: evidence.runnerActivity.id,
+      planned_workout_id: null,
+    });
+    const activityHistoryAfterDelete = await listRunnerActivityHistoryForUser({
+      userId: owner.userId,
+    });
+    assert.ok(
+      activityHistoryAfterDelete.items.some((item) => item.id === evidence.runnerActivity.id),
+      "Calendar Delete must retain the factual Activity in Activity History.",
+    );
+    const resultDeleteAudit = await loadLatestMutationEvent(
+      supabase,
+      owner.userId,
+      plannedWorkoutId,
+    );
+    assert.equal(resultDeleteAudit.mutation_kind, "user_cleared_workout");
+    assert.equal(resultDeleteAudit.review_checksum, resultDeleteReview.candidate.reviewChecksum);
+
     const protectedInitializer = await initializeWorkoutDocumentForUser(owner.userId, {
       origin: "calendar",
       workoutId: plannedWorkoutId,
     });
     assert.equal(protectedInitializer.ok, false);
-    if (!protectedInitializer.ok) assert.equal(protectedInitializer.reason, "protected");
+    if (!protectedInitializer.ok) assert.equal(protectedInitializer.reason, "not_found");
     const foreignWorkout = await initializeWorkoutDocumentForUser(isolationUser.userId, {
       origin: "calendar",
       workoutId: plannedWorkoutId,
     });
     assert.equal(foreignWorkout.ok, false);
     if (!foreignWorkout.ok) assert.equal(foreignWorkout.reason, "not_found");
-    await assertEvidenceStillPresent(supabase, evidence);
 
     proof = {
       easyInitializerMaterializeReload: true,
@@ -562,7 +799,9 @@ export async function validateManualWorkoutDisposablePersistenceProof({
       sourceRemovalAfterReviewStable: true,
       malformedTemplateRejected: true,
       ownerIsolation: true,
-      fitEvidenceProtection: true,
+      exactFitSourceReuse: true,
+      pastAndResultBackedCopyDelete: true,
+      fitActivityAndRawSourceRetainedAfterCalendarDelete: true,
       explicitConfirmLifecycleCommands: ["copy", "move", "delete", "clear"],
       storedRestDisplacementAndUndoAudit: true,
       callsOpenAi: false,
@@ -672,67 +911,6 @@ async function loadLatestMutationEvent(
     .single();
   if (row.error) throw new Error(row.error.message);
   return row.data;
-}
-
-async function insertProtectedWorkoutEvidence(
-  supabase: AdminSupabaseClient,
-  userId: string,
-  workout: PersistedPlannedWorkoutRow,
-) {
-  const workoutLogId = crypto.randomUUID();
-  const workoutLog = await supabase
-    .from("workout_logs")
-    .insert({
-      id: workoutLogId,
-      user_id: userId,
-      planned_workout_id: workout.id,
-      outcome: "completed",
-      actual_distance_km: 5,
-      actual_duration_min: 35,
-      rpe: 5,
-      notes: "Canonical Workout protection proof",
-      intervals_completed: null,
-      body_notes: [],
-    })
-    .select("id")
-    .single();
-  if (workoutLog.error) throw new Error(workoutLog.error.message);
-
-  const resultAssetId = crypto.randomUUID();
-  const resultAsset = await supabase
-    .from("workout_result_assets")
-    .insert({
-      id: resultAssetId,
-      user_id: userId,
-      planned_workout_id: workout.id,
-      workout_log_id: workoutLogId,
-      asset_kind: "garmin_fit",
-      storage_bucket: "workout-result-assets",
-      storage_path: `canonical-workout-proof/${resultAssetId}.fit`,
-      original_file_name: "canonical-workout-proof.fit",
-      mime_type: "application/octet-stream",
-      file_size_bytes: 1,
-      parse_status: "uploaded",
-      primary_file_kind: "fit",
-      primary_file_name: "canonical-workout-proof.fit",
-    })
-    .select("id")
-    .single();
-  if (resultAsset.error) throw new Error(resultAsset.error.message);
-
-  return { workoutLogId, resultAssetId };
-}
-
-async function assertEvidenceStillPresent(
-  supabase: AdminSupabaseClient,
-  evidence: { workoutLogId: string; resultAssetId: string },
-) {
-  const [log, asset] = await Promise.all([
-    supabase.from("workout_logs").select("id").eq("id", evidence.workoutLogId).single(),
-    supabase.from("workout_result_assets").select("id").eq("id", evidence.resultAssetId).single(),
-  ]);
-  assert.equal(log.error, null);
-  assert.equal(asset.error, null);
 }
 
 function processCalendarTimezone() {

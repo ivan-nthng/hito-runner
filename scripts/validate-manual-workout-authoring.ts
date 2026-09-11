@@ -7,7 +7,13 @@ import {
   listSupportedManualWorkoutTemplates,
   type ManualWorkoutSavedTemplateRepository,
 } from "../src/lib/manual-workout-authoring";
+import {
+  resolveCalendarAddActionContext,
+  resolveCalendarWorkoutActionContext,
+} from "../src/components/calendar/calendar-projection";
+import type { CalendarWorkoutSourceEditingCapabilities } from "../src/lib/runner-calendar-mutations";
 import type { Json } from "../src/lib/supabase/database";
+import { getPreviewSnapshot, type TrainingSnapshot, type Workout } from "../src/lib/training";
 import {
   confirmWorkoutCommand,
   reviewWorkoutCommand,
@@ -32,6 +38,7 @@ async function main() {
   const options = readManualPersistenceCliOptions();
   validateCanonicalInitializers();
   validateCalendarLifecycleCommandReview();
+  await validateCalendarProductActionMatrix();
   await validateCanonicalSavedTemplateInitializer();
   await validateAuthoringDeletionGates();
 
@@ -49,6 +56,270 @@ async function main() {
     initializers: { scratch: 1, builtIns: 18 },
     persistence,
   });
+}
+
+async function validateCalendarProductActionMatrix() {
+  const currentDate = "2026-09-01";
+  const pastDate = "2026-08-31";
+  const futureDate = "2026-09-02";
+  const previewWorkout = getPreviewSnapshot().workouts.find((workout) => workout.type !== "rest");
+  assert.ok(previewWorkout, "The Calendar action proof needs one canonical workout presentation.");
+
+  const allowedCapability = (
+    operation: "add_workout" | "clear_workout" | "move_workout" | "edit_workout",
+  ) => ({
+    allowed: true as const,
+    operation,
+    sourceKind: "manual_workout_authoring_v1",
+    sourceStatus: "confirmed",
+  });
+  const baseSnapshot: TrainingSnapshot = {
+    backend: "supabase",
+    calendarContext: {
+      workoutEditing: {
+        addWorkout: allowedCapability("add_workout"),
+        clearWorkout: allowedCapability("clear_workout"),
+        moveWorkout: allowedCapability("move_workout"),
+        editWorkout: allowedCapability("edit_workout"),
+      },
+    },
+    currentDate,
+    mode: "authenticated",
+    profile: {
+      age: 34,
+      avatarStoragePath: null,
+      avatarUrl: null,
+      baselineLongRunKm: 12,
+      baselineNotes: null,
+      baselineSessionsPerWeek: 4,
+      calendarTimezone: "America/Sao_Paulo",
+      calendarTimezoneSource: "user",
+      displayName: "Fixture runner",
+      firstName: "Fixture",
+      goalLabel: null,
+      goalType: "build_consistency",
+      heightCm: 178,
+      lastName: "Runner",
+      weightKg: 72,
+    },
+    source: "persisted",
+    weekStatus: "on_track",
+    workouts: [],
+  };
+  const sourceEditing = (input: {
+    canEditContent: boolean;
+    canMove: boolean;
+    dateState: "past" | "current" | "future";
+    resultBacked?: boolean;
+  }): CalendarWorkoutSourceEditingCapabilities => ({
+    canClear: true,
+    canCopy: true,
+    canDirectCopy: true,
+    canDirectMove: input.canMove,
+    canDragInitiate: input.canMove,
+    canEditContent: input.canEditContent,
+    canMove: input.canMove,
+    copyReason: null,
+    editContentReason: input.canEditContent ? null : input.resultBacked ? "logged_workout" : null,
+    eligibility: input.resultBacked
+      ? "blocked"
+      : input.dateState === "past"
+        ? "eligible_past_unlogged"
+        : input.dateState === "current"
+          ? "eligible_current_unlogged"
+          : "eligible_future_unlogged",
+    message: null,
+    reason: input.resultBacked ? "logged_workout" : null,
+  });
+  const workout = (input: {
+    date: string;
+    dateState: "past" | "current" | "future";
+    canEditContent: boolean;
+    canMove: boolean;
+    resultBacked?: boolean;
+  }): Workout => ({
+    ...previewWorkout,
+    date: input.date,
+    id: `calendar-${input.date}-${input.resultBacked ? "result" : "plain"}`,
+    log: input.resultBacked
+      ? {
+          actualDistanceKm: 5,
+          actualDurationMin: 30,
+          bodyNotes: [],
+          intervalsCompleted: null,
+          loggedAt: "2026-09-01T10:00:00.000Z",
+          notes: null,
+          outcome: "completed",
+          rpe: 5,
+        }
+      : null,
+    sourceEditing: sourceEditing(input),
+    sourceProvenance: {
+      originKind: "manual",
+      sourceKind: "manual_workout_authoring_v1",
+      sourcePlanId: null,
+      sourceStatus: "confirmed",
+    },
+    status: input.resultBacked ? "completed" : input.date === currentDate ? "today" : "upcoming",
+  });
+  const restWorkout = (date: string): Workout => ({
+    ...previewWorkout,
+    date,
+    id: `calendar-rest-${date}`,
+    log: null,
+    sourceEditing: null,
+    sourceProvenance: null,
+    status: "rest",
+    title: "Rest",
+    type: "rest",
+  });
+  const addActions = (date: string, value?: Workout) => {
+    const context = resolveCalendarAddActionContext(baseSnapshot, date, value, null);
+    return context
+      ? [
+          ...(context.canAddActivity ? ["Add Activity"] : []),
+          ...(context.canAddWorkout ? ["New Workout", "From Template"] : []),
+        ]
+      : [];
+  };
+  const workoutActions = (date: string, value: Workout) => {
+    const context = resolveCalendarWorkoutActionContext(baseSnapshot, date, value);
+    return context
+      ? [
+          ...(context.canAddActivity ? ["Add Activity"] : []),
+          ...(context.canEditContent ? ["Edit"] : []),
+          ...(context.canDirectCopy ? ["Copy"] : []),
+          ...(context.canDirectMove ? ["Move"] : []),
+          ...(context.canRequestClearReview ? ["Delete"] : []),
+        ]
+      : [];
+  };
+
+  assert.deepEqual(addActions(pastDate), ["Add Activity"]);
+  assert.deepEqual(addActions(pastDate, restWorkout(pastDate)), ["Add Activity"]);
+  assert.deepEqual(addActions(currentDate), ["Add Activity", "New Workout", "From Template"]);
+  assert.deepEqual(addActions(currentDate, restWorkout(currentDate)), [
+    "Add Activity",
+    "New Workout",
+    "From Template",
+  ]);
+  assert.deepEqual(addActions(futureDate), ["New Workout", "From Template"]);
+  assert.deepEqual(addActions(futureDate, restWorkout(futureDate)), [
+    "New Workout",
+    "From Template",
+  ]);
+  assert.deepEqual(
+    workoutActions(
+      pastDate,
+      workout({
+        canEditContent: false,
+        canMove: false,
+        date: pastDate,
+        dateState: "past",
+      }),
+    ),
+    ["Add Activity", "Copy", "Delete"],
+  );
+  assert.deepEqual(
+    workoutActions(
+      pastDate,
+      workout({
+        canEditContent: false,
+        canMove: false,
+        date: pastDate,
+        dateState: "past",
+        resultBacked: true,
+      }),
+    ),
+    ["Add Activity", "Copy", "Delete"],
+  );
+  assert.deepEqual(
+    workoutActions(
+      currentDate,
+      workout({
+        canEditContent: true,
+        canMove: true,
+        date: currentDate,
+        dateState: "current",
+      }),
+    ),
+    ["Add Activity", "Edit", "Copy", "Move", "Delete"],
+  );
+  assert.deepEqual(
+    workoutActions(
+      currentDate,
+      workout({
+        canEditContent: false,
+        canMove: false,
+        date: currentDate,
+        dateState: "current",
+        resultBacked: true,
+      }),
+    ),
+    ["Add Activity", "Copy", "Delete"],
+  );
+  assert.deepEqual(
+    workoutActions(
+      futureDate,
+      workout({
+        canEditContent: true,
+        canMove: true,
+        date: futureDate,
+        dateState: "future",
+      }),
+    ),
+    ["Edit", "Copy", "Move", "Delete"],
+  );
+
+  const [calendarSource, addMenuSource, sourceMenuSource, dragSource, moveDialogSource] =
+    await Promise.all(
+      [
+        "../src/components/Calendar.tsx",
+        "../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx",
+        "../src/components/manual-workout/ManualWorkoutSourceActionMenu.tsx",
+        "../src/components/calendar/manual-calendar-actions.ts",
+        "../src/components/manual-workout/ManualWorkoutMoveControls.tsx",
+      ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")),
+    );
+  assert.match(calendarSource, /canEdit=\{sourceAction\.canEditContent\}/);
+  assert.match(calendarSource, /<HitoButton[\s\S]*more-horizontal/);
+  assert.doesNotMatch(calendarSource, /hito-button hito-button-ghost hito-button-xs/);
+  assert.match(
+    addMenuSource,
+    /<DropdownMenuContent align="end" className="hito-menu-width-standard">/,
+  );
+  assert.match(
+    sourceMenuSource,
+    /<DropdownMenuContent align="end" className="hito-menu-width-standard">/,
+  );
+  assert.match(addMenuSource, /t\("New Workout"\)/);
+  assert.match(addMenuSource, /t\("From Template"\)/);
+  assert.match(sourceMenuSource, /t\("Edit workout"\)/);
+  assert.match(sourceMenuSource, /t\("Delete workout"\)/);
+  assert.doesNotMatch(sourceMenuSource, /t\("Clear workout"\)/);
+  assert.match(
+    sourceMenuSource,
+    /Any saved Activity remains in Activity History\./,
+    "Delete confirmation must disclose retained factual Activity truth.",
+  );
+  assert.match(
+    dragSource,
+    /flushSync\(\(\) => manualCalendarActionState\.onMoveWorkout\(context\)\)/,
+    "Native drag must commit source selection before the browser evaluates drop targets.",
+  );
+  assert.match(
+    calendarSource,
+    /<CalendarDaySurface[\s\S]*?dragProps=\{manualMoveSourceDragProps\(/,
+    "The non-link Calendar day surface must own the native drag source props.",
+  );
+  assert.match(
+    calendarSource,
+    /<Link[\s\S]*?draggable=\{false\}[\s\S]*?<CalendarDaySurface/,
+    "The workout navigation link must not remain a native URL drag source.",
+  );
+  assert.match(calendarSource, /onMove=\{manualCalendarActionState\.onMoveWorkout\}/);
+  assert.match(moveDialogSource, /reviewWorkoutCommandAction/);
+  assert.match(moveDialogSource, /confirmWorkoutCommandAction/);
 }
 
 function validateCalendarLifecycleCommandReview() {

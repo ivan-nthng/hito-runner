@@ -606,11 +606,6 @@ function CalendarDaySlot({
         canDragMove && "cursor-grab active:cursor-grabbing",
       )}
       data-calendar-date={iso}
-      {...manualMoveSourceDragProps(
-        sourceAction,
-        manualCalendarActionState,
-        message("Move workout"),
-      )}
     >
       <Link
         to="/workout/$date"
@@ -622,6 +617,11 @@ function CalendarDaySlot({
       >
         <CalendarDaySurface
           className={isMoveSource ? "hito-calendar-move-source" : undefined}
+          dragProps={manualMoveSourceDragProps(
+            sourceAction,
+            manualCalendarActionState,
+            message("Move workout"),
+          )}
           interactive
           iso={iso}
           layout={layout}
@@ -679,6 +679,7 @@ function CalendarDaySlot({
           canAddActivity={sourceAction.canAddActivity}
           canCopy={sourceAction.canDirectCopy}
           canClear={sourceAction.canRequestClearReview}
+          canEdit={sourceAction.canEditContent}
           canMove={sourceAction.canDirectMove}
           onCleared={manualCalendarActionState.onCalendarChanged}
           onAddActivity={(trigger) => onAddActivity(iso, trigger)}
@@ -689,10 +690,10 @@ function CalendarDaySlot({
           title={sourceAction.title}
           workout={workout}
         >
-          <button
+          <HitoButton
             type="button"
             className={cn(
-              "hito-button hito-button-ghost hito-button-xs absolute z-30 aspect-square p-0",
+              "absolute z-30 aspect-square p-0",
               sourceActionMobile
                 ? "right-3 top-3"
                 : "opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 group-hover/manual-day:opacity-100 focus-visible:opacity-100",
@@ -702,6 +703,9 @@ function CalendarDaySlot({
             aria-label={message("More activity actions for {title}", {
               title: sourceAction.title,
             })}
+            iconOnly
+            size="xs"
+            variant="ghost"
             draggable={false}
             onDragStart={(event) => {
               event.preventDefault();
@@ -710,8 +714,8 @@ function CalendarDaySlot({
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            <Icon name="more-horizontal" size="xs" />
-          </button>
+            <Icon name="more-horizontal" size="xs" decorative />
+          </HitoButton>
         </ManualWorkoutSourceActionMenu>
       ) : null}
     </div>
@@ -749,6 +753,7 @@ CalendarDayButton.displayName = "CalendarDayButton";
 function CalendarDaySurface({
   action,
   className,
+  dragProps,
   interactive = false,
   iso,
   layout,
@@ -761,6 +766,7 @@ function CalendarDaySurface({
 }: {
   action?: Parameters<typeof HitoCalendarDayCell>[0]["action"];
   className?: string;
+  dragProps?: ReturnType<typeof manualMoveSourceDragProps>;
   interactive?: boolean;
   iso: string;
   layout: CalendarDaySlotLayout;
@@ -777,6 +783,7 @@ function CalendarDaySurface({
     return (
       <HitoWorkoutDayRow
         {...localizedPresentation}
+        {...dragProps}
         action={action}
         className={className}
         date={{
@@ -795,6 +802,7 @@ function CalendarDaySurface({
   return (
     <HitoCalendarDayCell
       {...localizedPresentation}
+      {...dragProps}
       action={action}
       className={cn("h-full", className)}
       day={iso.slice(8)}

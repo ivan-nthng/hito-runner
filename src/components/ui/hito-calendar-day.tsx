@@ -2,6 +2,7 @@ import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import { cn } from "@/lib/utils";
+import type { DragEventHandler } from "react";
 
 export type HitoCalendarDayBaseState = "workout" | "rest" | "empty" | "outside-month";
 
@@ -59,6 +60,9 @@ type SharedVisualProps = {
   stateLabel?: string | null;
   ariaLabel?: string;
   className?: string;
+  draggable?: boolean;
+  onDragEnd?: DragEventHandler<HTMLDivElement>;
+  onDragStart?: DragEventHandler<HTMLDivElement>;
 };
 
 type HitoCalendarDayCellProps = SharedVisualProps & {
@@ -78,12 +82,15 @@ export function HitoCalendarDayCell({
   className,
   day,
   dense = false,
+  draggable,
   feedback = "none",
   feedbackLabel,
   focused = false,
   interactive = false,
   layout = "month",
   muted = false,
+  onDragEnd,
+  onDragStart,
   pendingLabel,
   result = "none",
   resultLabel,
@@ -107,6 +114,9 @@ export function HitoCalendarDayCell({
       data-hito-calendar-day-cell=""
       data-hito-calendar-day-state={state}
       data-interactive={interactive ? "true" : undefined}
+      draggable={draggable}
+      onDragEnd={onDragEnd}
+      onDragStart={onDragStart}
       tabIndex={focused ? 0 : undefined}
       aria-label={ariaLabel}
       className={cn(
@@ -206,11 +216,14 @@ export function HitoWorkoutDayRow({
   ariaLabel,
   className,
   date,
+  draggable,
   feedback = "none",
   feedbackLabel,
   focused = false,
   interactive = false,
   muted = false,
+  onDragEnd,
+  onDragStart,
   pendingLabel,
   result = "none",
   resultLabel,
@@ -234,6 +247,9 @@ export function HitoWorkoutDayRow({
       data-hito-workout-day-row=""
       data-hito-calendar-day-state={state}
       data-interactive={interactive ? "true" : undefined}
+      draggable={draggable}
+      onDragEnd={onDragEnd}
+      onDragStart={onDragStart}
       tabIndex={focused ? 0 : undefined}
       aria-label={ariaLabel}
       className={cn(

@@ -9,8 +9,6 @@ export type WeekdayName =
   | "Friday"
   | "Saturday"
   | "Sunday";
-export type PlanGoalChoice = "" | "10k" | "half_marathon" | "marathon" | "custom";
-
 export interface StructuredConstructorState {
   age: string;
   weightKg: string;
@@ -22,12 +20,6 @@ export interface StructuredConstructorState {
   maxRunningDaysPerWeek: string;
   preferredLongRunDay: WeekdayName | "";
   startDate: string;
-  planGoalChoice: PlanGoalChoice;
-  planGoalCustomDistanceKm: string;
-  planGoalCustomDistanceLabel: string;
-  planGoalFinishTime: string;
-  planGoalTargetDate: string;
-  runnerComment: string;
 }
 
 export const WEEKDAY_OPTIONS: { value: WeekdayName; label: string }[] = [

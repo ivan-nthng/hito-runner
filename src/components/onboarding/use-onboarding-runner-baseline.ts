@@ -122,9 +122,6 @@ export function useOnboardingRunnerBaseline({
     isSaving: status === "saving",
     onHeartRateDraftStateChange: setHeartRateDraftState,
     persistHeartRateDraft,
-    previewContextKey: heartRateDraftState
-      ? `baseline:${inputKey}:heart-rate:${heartRateDraftState.key}`
-      : `baseline-pending:${inputKey}`,
     recommendedAge: input?.age ?? null,
     summary,
   };

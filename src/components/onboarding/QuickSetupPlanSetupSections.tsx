@@ -36,7 +36,6 @@ type QuickSetupPlanSetupSectionsProps = {
   heartRateProfile?: ReactNode;
   firstSectionNumber?: number;
   firstSectionHasDivider?: boolean;
-  fieldErrors?: Partial<Record<"age" | "heightCm" | "weightKg", string>>;
 };
 
 const RECENT_5K_TIME_OPTIONS = [
@@ -61,7 +60,6 @@ export function QuickSetupPlanSetupSections({
   heartRateProfile,
   firstSectionNumber = 1,
   firstSectionHasDivider = false,
-  fieldErrors = {},
 }: QuickSetupPlanSetupSectionsProps) {
   const locale = useHitoUiLocale();
   const message = useHitoProductMessage();
@@ -108,9 +106,6 @@ export function QuickSetupPlanSetupSections({
                 max={100}
                 step={1}
                 inputMode="numeric"
-                error={
-                  fieldErrors.age ? getHitoKnownProductMessage(locale, fieldErrors.age) : undefined
-                }
               />
               <EditableValueField
                 fieldKey="heightCm"
@@ -124,11 +119,6 @@ export function QuickSetupPlanSetupSections({
                 max={230}
                 step={1}
                 inputMode="numeric"
-                error={
-                  fieldErrors.heightCm
-                    ? getHitoKnownProductMessage(locale, fieldErrors.heightCm)
-                    : undefined
-                }
               />
               <EditableValueField
                 fieldKey="weightKg"
@@ -143,11 +133,6 @@ export function QuickSetupPlanSetupSections({
                 step={0.5}
                 inputMode="decimal"
                 unit="kg"
-                error={
-                  fieldErrors.weightKg
-                    ? getHitoKnownProductMessage(locale, fieldErrors.weightKg)
-                    : undefined
-                }
               />
             </div>
           </div>
